@@ -27,6 +27,21 @@ pretrain_example/
 └── infer.sh               # 推理脚本
 ```
 
+## 📦 依赖安装
+
+在开始之前，确保安装必要的依赖：
+
+```bash
+# 安装 ms-swift (如果还没安装)
+pip install ms-swift
+
+# 安装分词器训练依赖
+pip install tokenizers>=0.13.0
+
+# 或者安装示例目录下的所有依赖
+pip install -r requirements.txt
+```
+
 ## 🚀 快速开始
 
 ### 方式一：一键运行完整流程（推荐）
