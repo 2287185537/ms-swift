@@ -10,6 +10,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 from transformers import PretrainedConfig, PreTrainedModel
+from transformers.generation import GenerationMixin
 from transformers.modeling_outputs import CausalLMOutputWithPast
 
 
@@ -36,6 +37,7 @@ class CustomModelConfig(PretrainedConfig):
         bos_token_id=1,  # Begin of sequence token ID
         eos_token_id=2,  # End of sequence token ID
         tie_word_embeddings=False,  # 是否共享输入输出 embedding
+        use_cache=True,  # 是否使用 KV cache（用于推理加速）
         **kwargs
     ):
         self.vocab_size = vocab_size
@@ -48,6 +50,7 @@ class CustomModelConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
+        self.use_cache = use_cache
         
         super().__init__(
             pad_token_id=pad_token_id,
@@ -63,6 +66,10 @@ class CustomAttention(nn.Module):
     
     def __init__(self, config: CustomModelConfig):
         super().__init__()
+        if config.hidden_size % config.num_attention_heads != 0:
+            raise ValueError(
+                f"hidden_size ({config.hidden_size}) 必须能被 num_attention_heads ({config.num_attention_heads}) 整除"
+            )
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.all_head_size = self.num_attention_heads * self.attention_head_size
@@ -72,8 +79,8 @@ class CustomAttention(nn.Module):
         self.key = nn.Linear(config.hidden_size, self.all_head_size)
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
         
-        # 输出投影
-        self.out_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        # 输出投影（从 all_head_size 回到 hidden_size）
+        self.out_proj = nn.Linear(self.all_head_size, config.hidden_size)
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
@@ -256,7 +263,9 @@ class CustomModel(PreTrainedModel):
         
         # Position IDs
         if position_ids is None:
-            past_length = past_key_values[0][0].size(2) if past_key_values is not None else 0
+            past_length = 0
+            if past_key_values is not None and len(past_key_values) > 0 and past_key_values[0] is not None and len(past_key_values[0]) > 0:
+                past_length = past_key_values[0][0].size(2)
             position_ids = torch.arange(past_length, seq_length + past_length, dtype=torch.long, device=input_ids.device)
             position_ids = position_ids.unsqueeze(0).expand(batch_size, -1)
         
@@ -312,10 +321,11 @@ class CustomModel(PreTrainedModel):
         }
 
 
-class CustomModelForCausalLM(PreTrainedModel):
+class CustomModelForCausalLM(PreTrainedModel, GenerationMixin):
     """
     用于因果语言建模的自定义模型
     添加 LM Head 用于预测下一个 token
+    继承 GenerationMixin 以支持文本生成功能
     """
     config_class = CustomModelConfig
     base_model_prefix = "model"
