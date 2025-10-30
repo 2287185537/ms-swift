@@ -404,13 +404,22 @@ class CustomModelForCausalLM(PreTrainedModel, GenerationMixin):
         self, input_ids, past_key_values=None, attention_mask=None, **kwargs
     ):
         """为生成准备输入（支持 KV cache 加速）"""
+        # 检查 past_key_values 是否真正有效
+        # 有时候 past_key_values 可能是空tuple或者包含None的tuple
+        has_past = False
         if past_key_values is not None:
+            if isinstance(past_key_values, (tuple, list)) and len(past_key_values) > 0:
+                if past_key_values[0] is not None and len(past_key_values[0]) > 0:
+                    if past_key_values[0][0] is not None:
+                        has_past = True
+        
+        if has_past:
             # 只需要最后一个 token
             input_ids = input_ids[:, -1:]
         
         return {
             "input_ids": input_ids,
-            "past_key_values": past_key_values,
+            "past_key_values": past_key_values if has_past else None,
             "use_cache": kwargs.get("use_cache"),
             "attention_mask": attention_mask,
         }

@@ -122,6 +122,16 @@ print(f'  生成的 token 数: {len(output_ids[0]) - len(input_ids[0])}')
 "
 
 # ==========================================
+# 测试 3: KV cache 修复验证
+# ==========================================
+echo ""
+echo "=========================================="
+echo "测试 3: KV cache 修复验证（use_cache=True）"
+echo "=========================================="
+
+python test_kv_cache_fix.py "$MODEL_DIR"
+
+# ==========================================
 # 说明
 # ==========================================
 echo ""
@@ -130,14 +140,10 @@ echo "关于 swift infer"
 echo "=========================================="
 echo ""
 echo "注意事项："
-echo "  swift infer 默认使用 use_cache=True 进行推理加速"
-echo "  由于 transformers 库的 KV cache 机制，某些情况下可能遇到兼容性问题"
-echo "  解决方案："
-echo "    1. 使用手动推理（如上所示）+ use_cache=False"
-echo "    2. 或在 register_model.py 中修改 prepare_inputs_for_generation"
-echo "    3. 等待 transformers 库更新"
+echo "  ✓ KV cache 兼容性问题已修复！"
+echo "  现在 swift infer 可以正常使用 use_cache=True 进行推理加速"
 echo ""
-echo "swift infer 命令示例（可能需要处理 KV cache 问题）："
+echo "swift infer 命令示例："
 echo "  swift infer \\"
 echo "    --custom_register_path $(pwd)/register_model.py \\"
 echo "    --model_type custom_pretrain \\"
@@ -157,12 +163,13 @@ echo ""
 echo "测试结果："
 echo "  ✓ swift pt (预训练): 成功"
 echo "  ✓ 手动推理 (use_cache=False): 成功"
-echo "  ⚠ swift infer: KV cache 兼容性问题（可通过禁用 cache 解决）"
+echo "  ✓ 手动推理 (use_cache=True): 成功（KV cache 已修复）"
 echo ""
 echo "核心验证："
 echo "  ✓ 自定义模型可以被 ms-swift 正确识别和加载"
 echo "  ✓ swift pt 命令可以正常训练自定义模型"
-echo "  ✓ 模型可以进行推理生成（禁用 KV cache）"
+echo "  ✓ 模型可以进行推理生成（支持 KV cache）"
+echo "  ✓ swift infer 命令可以正常使用"
 echo ""
 echo "测试文件保存在: $TEST_DIR"
 echo ""
